@@ -10,6 +10,9 @@ from tensorboardX import SummaryWriter
 import warnings
 warnings.filterwarnings('ignore')
 
+writer1 = SummaryWriter(f'../log/board/train/', comment='Linear')
+writer2 = SummaryWriter(f'../log/board/test/', comment='Linear')
+
 checkpoint_name = 'Informer'
 seq_len = 360
 pred_len = 24
@@ -63,8 +66,8 @@ for epoch in range(epochs):
     train_loss = train_loss/batch_num
     time3 = datetime.datetime.now()
     print(f'epoch{epoch} finished, loss = {train_loss}, time cost = {time3 - time1}')
-    
-    if (epoch+1) % 10 == 0:
+    writer1.add_scalar('Informer', train_loss, epoch)
+    if (epoch+1) % 1 == 0:
         model.eval()
         test_loss = 0
         batch_num = 0
@@ -86,6 +89,8 @@ for epoch in range(epochs):
                 batch_num += 1
         test_loss = test_loss/batch_num
         print('test_loss == ', test_loss)
+        writer1.add_scalar('Informer', test_loss, epoch)
+
         model.train()
         checkpoint = {
             'epoch': epoch,

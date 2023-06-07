@@ -1,0 +1,4 @@
+log/
+dataset/
+*.pyc
+__pycache__/
