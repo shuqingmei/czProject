@@ -12,18 +12,26 @@ class DatasetLoader(Data.Dataset):
         output: (series_len, feature_num)
         '''
         super(DatasetLoader, self).__init__()
-        df = pd.read_csv('/mnt/nfsData10/GuoLongZhao/dataset/cz/项目部超声波风速风向_10T_max.csv')
+        df = pd.read_csv('/mnt/nfsData10/GuoLongZhao/czProject/dataset/项目部超声波风速风向_10T_max.csv')
+        df_min = pd.read_csv('/mnt/nfsData10/GuoLongZhao/czProject/dataset/项目部超声波风速风向_10T_min.csv')
+        df_mean = pd.read_csv('/mnt/nfsData10/GuoLongZhao/czProject/dataset/项目部超声波风速风向_10T_mean.csv')
+        df_var = pd.read_csv('/mnt/nfsData10/GuoLongZhao/czProject/dataset/项目部超声波风速风向_10T_var.csv')
+        df_max = df.iloc[:, 1:3].values
+        df_min = df_min.iloc[:, 1:3].values
+        df_var = df_var.iloc[:, 1:3].values
+        df_mean = df_mean.iloc[:, 1:3].values
+        df_data = np.concatenate((df_max, df_min, df_mean, df_var), axis=1)
+        mean = np.average(df_data, axis=0)
+        std = np.std(df_data, axis=0)
         df_stamp = df[['date']]
         df_stamp['date'] = pd.to_datetime(df_stamp.date)
         self.data_stamp = timefeature.time_features(df_stamp, 0, 't')
-        df = df.iloc[:, 1:3]
-        self.train_data = df.values
+        self.train_data = df_data
         self.seq_len = seq_len
         self.label_len = label_len
         self.pred_len = pred_len
         l = int(len(self.train_data)* 0.8)
-        mean = [289.13437024, 3.57612728]
-        std = [90.2695285, 2.64502802]
+
         self.train_data = (self.train_data - mean) / std 
         if flag==0:
             self.train_data = self.train_data[:l, :]
@@ -51,4 +59,4 @@ class DatasetLoader(Data.Dataset):
         return enc_in, enc_mask, dec_in, dec_mask 
     
     def inverse_transform(self, data):
-        return data * 2.64502802 + 3.57612728
+        return data * 2.55054430 + 3.60226484

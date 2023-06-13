@@ -10,14 +10,16 @@ from tensorboardX import SummaryWriter
 import warnings
 warnings.filterwarnings('ignore')
 
-writer1 = SummaryWriter(f'../log/board/train/', comment='Linear')
-writer2 = SummaryWriter(f'../log/board/test/', comment='Linear')
+TENSORBOARD = False
+if TENSORBOARD:
+    writer1 = SummaryWriter(f'../log/board/train/', comment='Linear')
+    writer2 = SummaryWriter(f'../log/board/test/', comment='Linear')
 
 checkpoint_name = 'Informer'
 seq_len = 360
 pred_len = 24
 label_len = 180
-input_size = 2
+input_size = 8
 output_size = 1
 
 train_data = dl.DatasetLoader(seq_len, label_len, pred_len)
@@ -51,7 +53,7 @@ for epoch in range(epochs):
         enc_mask = enc_mask.to(device).float()  #
         dec_in = dec_in.to(device).float()  #
         dec_mask = dec_mask.to(device).float()  #
-        label = dec_in[:, label_len:, 1:]
+        label = dec_in[:, label_len:, 1:2]
         dec_inp = torch.zeros([dec_in.shape[0], pred_len, dec_in.shape[-1]]).float().to(device)
         dec_in = torch.cat([dec_in[:,:label_len,:], dec_inp], dim=1).float()
 
@@ -66,7 +68,8 @@ for epoch in range(epochs):
     train_loss = train_loss/batch_num
     time3 = datetime.datetime.now()
     print(f'epoch{epoch} finished, loss = {train_loss}, time cost = {time3 - time1}')
-    writer1.add_scalar('Informer', train_loss, epoch)
+    if TENSORBOARD:
+        writer1.add_scalar('Informer', train_loss, epoch)
     if (epoch+1) % 1 == 0:
         model.eval()
         test_loss = 0
@@ -77,7 +80,7 @@ for epoch in range(epochs):
                 enc_mask = enc_mask.to(device).float()  #
                 dec_in = dec_in.to(device).float()  #
                 dec_mask = dec_mask.to(device).float()  #
-                label = dec_in[:, label_len:, 1:]
+                label = dec_in[:, label_len:, 1:2]
                 dec_inp = torch.zeros([dec_in.shape[0], pred_len, dec_in.shape[-1]]).float().to(device)
                 dec_in = torch.cat([dec_in[:,:label_len,:], dec_inp], dim=1).float()
                 pred = model(enc_in, enc_mask, dec_in, dec_mask)
@@ -89,14 +92,15 @@ for epoch in range(epochs):
                 batch_num += 1
         test_loss = test_loss/batch_num
         print('test_loss == ', test_loss)
-        writer1.add_scalar('Informer', test_loss, epoch)
+        if TENSORBOARD:
+            writer1.add_scalar('Informer', test_loss, epoch)
 
         model.train()
-        checkpoint = {
-            'epoch': epoch,
-            'model': model.state_dict(),
-            'optimizer': optimizer.state_dict(),
-        }
-        if not os.path.exists(f'../log/checkpoint/{checkpoint_name}'):
-            os.makedirs(f'../log/checkpoint/{checkpoint_name}')
-        torch.save(checkpoint, f'../log/checkpoint/{checkpoint_name}/{epoch+1}.pth')
+        # checkpoint = {
+        #     'epoch': epoch,
+        #     'model': model.state_dict(),
+        #     'optimizer': optimizer.state_dict(),
+        # }
+        # if not os.path.exists(f'../log/checkpoint/{checkpoint_name}'):
+        #     os.makedirs(f'../log/checkpoint/{checkpoint_name}')
+        # torch.save(checkpoint, f'../log/checkpoint/{checkpoint_name}/{epoch+1}.pth')
