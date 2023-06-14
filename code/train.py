@@ -10,16 +10,16 @@ from tensorboardX import SummaryWriter
 import warnings
 warnings.filterwarnings('ignore')
 
-TENSORBOARD = False
+TENSORBOARD = False  # 是否开启tensorboard曲线
 if TENSORBOARD:
-    writer1 = SummaryWriter(f'../log/board/train/', comment='Linear')
-    writer2 = SummaryWriter(f'../log/board/test/', comment='Linear')
+    writer1 = SummaryWriter(f'../log/board/train/', comment='Linear')  # trainloss曲线路径  
+    writer2 = SummaryWriter(f'../log/board/test/', comment='Linear')   # testloss曲线路径
 
 checkpoint_name = 'Informer'
 seq_len = 360
-pred_len = 24
+pred_len = 24  # 预测长度
 label_len = 180
-input_size = 8
+input_size = 8  # 输入特征数量
 output_size = 1
 
 train_data = dl.DatasetLoader(seq_len, label_len, pred_len)
@@ -96,6 +96,7 @@ for epoch in range(epochs):
             writer1.add_scalar('Informer', test_loss, epoch)
 
         model.train()
+        # 保存checkpoint
         # checkpoint = {
         #     'epoch': epoch,
         #     'model': model.state_dict(),
