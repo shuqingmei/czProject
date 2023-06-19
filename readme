@@ -1,4 +1,24 @@
-123
-123
-123
-123
+输入格式：csv文件，具体格式还不确定
+    --日期：date，风速：wind_speed，风向：wind_direction，温度：temperature，湿度：humidity
+
+输出格式：字典数组
+    --key值：
+        -时间：date【日期类型】
+
+        -1小时风速：1hwind_speed【float】
+        -。。。
+        -18小时风速
+
+        -1小时温度：1htemperature
+        -。。。
+        -18小时温度
+
+        -1天风速：1dwind_speed
+        -。。。
+        -7天风速
+
+训练命令：
+    -python train.py --模型信息（输入步长，预测步长，时间间隔，模型名称等模型中所要用到的参数） --训练数据路径 --权重保存路径 --其他
+
+预测命令：
+    -python predic.py --模型信息 --数据路径 --等
