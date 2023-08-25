@@ -1,8 +1,8 @@
 import pandas as pd
 import torch.utils.data as Data
 import numpy as np
-import utils.tools as tools
-import utils.timefeature as timefeature
+from  ..utils import tools
+from  ..utils import timefeature
 import random
 
 class DatasetLoader(Data.Dataset):
@@ -25,12 +25,14 @@ class DatasetLoader(Data.Dataset):
         std = np.std(df_data, axis=0)
         df_stamp = df[['date']]
         df_stamp['date'] = pd.to_datetime(df_stamp.date)
+        # date列转换为日期时间格式
         self.data_stamp = timefeature.time_features(df_stamp, 0, 't')
         self.train_data = df_data
         self.seq_len = seq_len
         self.label_len = label_len
         self.pred_len = pred_len
         l = int(len(self.train_data)* 0.8)
+        # 训练集：测试集8：2
 
         self.train_data = (self.train_data - mean) / std 
         if flag==0:

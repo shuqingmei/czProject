@@ -54,8 +54,10 @@ for epoch in range(epochs):
         dec_in = dec_in.to(device).float()  #
         dec_mask = dec_mask.to(device).float()  #
         label = dec_in[:, label_len:, 1:2]
+        # 取出原始数据后24风速作为label
         dec_inp = torch.zeros([dec_in.shape[0], pred_len, dec_in.shape[-1]]).float().to(device)
         dec_in = torch.cat([dec_in[:,:label_len,:], dec_inp], dim=1).float()
+        # 将dec_in后24风速风向数据置零
 
         optimizer.zero_grad()
         pred = model(enc_in, enc_mask, dec_in, dec_mask)

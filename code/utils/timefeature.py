@@ -20,6 +20,7 @@ class SecondOfMinute(TimeFeature):
     def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
         return index.second / 59.0 - 0.5
 
+# 调用SecondOfMinute类的实例时，将传入一个时间索引，然后返回相应时间索引的秒数在[-0.5, 0.5]范围内的值的数组。。
 class MinuteOfHour(TimeFeature):
     """Minute of hour encoded as value between [-0.5, 0.5]"""
     def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
@@ -90,6 +91,8 @@ def time_features_from_frequency_str(freq_str: str) -> List[TimeFeature]:
     }
 
     offset = to_offset(freq_str)
+    # 将字符串频率转换为 pandas 中的 Offset 对象
+    # 使用该对象对日期进行加减运算，获取新的日期
 
     for offset_type, feature_classes in features_by_offsets.items():
         if isinstance(offset, offset_type):
@@ -149,3 +152,12 @@ def time_features(dates, timeenc=1, freq='h', minute=10):
     if timeenc==1:
         dates = pd.to_datetime(dates.date.values)
         return np.vstack([feat(dates) for feat in time_features_from_frequency_str(freq)]).transpose(1,0)
+
+    # 包含dates列的示例数据框
+    # dates = pd.DataFrame({'date': ['2021-01-01 12:00:00', '2021-01-01 13:30:00', '2021-01-02 08:45:00']})
+    # # 提取时间特征
+    # output = time_features(dates, timeenc=0, freq='h', minute=15)
+    # print(output)
+    # [[ 1  1  4 12]
+    #  [ 1  1  4 13]
+    #  [ 1  2  5  8]]

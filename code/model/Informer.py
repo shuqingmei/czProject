@@ -249,10 +249,13 @@ class TriangularCausalMask():
 class ProbMask():
     def __init__(self, B, H, L, index, scores, device="cpu"):
         _mask = torch.ones(L, scores.shape[-1], dtype=torch.bool).to(device).triu(1)
+        # 上三角矩阵的掩码
         _mask_ex = _mask[None, None, :].expand(B, H, L, scores.shape[-1])
+        # 扩充维度
         indicator = _mask_ex[torch.arange(B)[:, None, None],
                              torch.arange(H)[None, :, None],
                              index, :].to(device)
+        # 为了获得index对应的那几行矩阵，然后和sorce一样的维度
         self._mask = indicator.view(scores.shape).to(device)
     
     @property
@@ -323,19 +326,27 @@ class ProbAttention(nn.Module):
 
         # calculate the sampled Q_K
         K_expand = K.unsqueeze(-3).expand(B, H, L_Q, L_K, E)
+        # 升维度，复制了l_Q个K用来计算和Q的值
         index_sample = torch.randint(L_K, (L_Q, sample_k)) # real U = U_part(factor*ln(L_k))*L_q
+        # 采样，生成（L_Q,sample_k）的矩阵，代表了采样的
         K_sample = K_expand[:, :, torch.arange(L_Q).unsqueeze(1), index_sample, :]  # B H L_Q sample_k E
+        # 通常用于构建索引矩阵，以选择或操作其他张量中的特定元素。在给定的上下文中，这个索引矩阵用于选择K_expand张量中相应的K副本的值
         Q_K_sample = torch.matmul(Q.unsqueeze(-2), K_sample.transpose(-2, -1)).squeeze(-2)  # B H L_Q 1 E  x  B H L_Q sample_k E
-
+        # B H L_Q sample_k
         # find the Top_k query with sparisty measurement
         M = Q_K_sample.max(-1)[0] - torch.div(Q_K_sample.sum(-1), L_K)
-        M_top = M.topk(n_top, sorted=False)[1]  # topk index
+        # 返回最后一个维度的最大值与最后一个维度的均值的差值  B H l_Q
+        M_top = M.topk(n_top, sorted=False)[1]  # topk index B H Q_re
+        # 为了获取前几个最大的值的索引值，就是l_Q的索引
 
         # use the reduced Q to calculate Q_K
         Q_reduce = Q[torch.arange(B)[:, None, None],
                      torch.arange(H)[None, :, None],
                      M_top, :] # factor*ln(L_q)
         Q_K = torch.matmul(Q_reduce, K.transpose(-2, -1)) # factor*ln(L_q)*L_k
+        # B H Q_re E * B H E l_K
+        # B H Q_re l_k
+        # Q_re 索引
 
         return Q_K, M_top
 
@@ -345,9 +356,11 @@ class ProbAttention(nn.Module):
             # V_sum = V.sum(dim=-2)
             V_sum = V.mean(dim=-2)
             contex = V_sum.unsqueeze(-2).expand(B, H, L_Q, V_sum.shape[-1]).clone()
+            # contex 用V的均值来代替，在l_V的维度，确实应该是这个维度，注意力就是和各个向量的平均，不是向量维度的平均
         else: # use mask
             assert(L_Q == L_V) # requires that L_Q == L_V, i.e. for self-attention only
             contex = V.cumsum(dim=-2)
+            # 结果张量的每个元素都等于原始张量中该位置及之前所有位置上的元素的累积和
         return contex
 
     def _update_context(self, context_in, V, scores, index, L_Q, attn_mask):
@@ -356,12 +369,14 @@ class ProbAttention(nn.Module):
         if self.mask_flag:
             attn_mask = ProbMask(B, H, L_Q, index, scores, device=V.device)
             scores.masked_fill_(attn_mask.mask, -np.inf)
+            # 这是一个原地操作，使用了 torch.masked_fill_() 方法。它将 scores 张量中在 attn_mask.mask 为 True 的位置的值替换为 -np.inf（负无穷）
 
         attn = torch.softmax(scores, dim=-1) # nn.Softmax(dim=-1)(scores)
 
         context_in[torch.arange(B)[:, None, None],
                    torch.arange(H)[None, :, None],
                    index, :] = torch.matmul(attn, V).type_as(context_in)
+        # 将index进行替换
         if self.output_attention:
             attns = (torch.ones([B, H, L_V, L_V])/L_V).type_as(attn).to(attn.device)
             attns[torch.arange(B)[:, None, None], torch.arange(H)[None, :, None], index, :] = attn
@@ -391,6 +406,7 @@ class ProbAttention(nn.Module):
             scores_top = scores_top * scale
         # get the context
         context = self._get_initial_context(values, L_Q)
+        # V B H l_k E
         # update the context with selected top_k queries
         context, attn = self._update_context(context, values, scores_top, index, L_Q, attn_mask)
         
@@ -510,6 +526,7 @@ class Informer(nn.Module):
             ] if distil else None,
             norm_layer=torch.nn.LayerNorm(d_model)
         )
+        # 三个注意力层，两个卷积层交替，最后是norm层
         self.decoder = Decoder(
             [
                 DecoderLayer(
@@ -526,6 +543,7 @@ class Informer(nn.Module):
             ],
             norm_layer=torch.nn.LayerNorm(d_model)
         )
+        # 两个Decoder层，一个norm层
         self.projection = nn.Linear(d_model, c_out, bias=True)
     def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, 
                 enc_self_mask=None, dec_self_mask=None, dec_enc_mask=None):
@@ -535,33 +553,44 @@ class Informer(nn.Module):
         对输入进行相对时间编码，绝对时间编码，数据编码
         '''
         enc_out = self.enc_embedding(x_enc, x_mark_enc)
+        # B L 512 B 360 512
         '''
         网络的编码阶段
         '''
         enc_out, attns = self.encoder(enc_out, attn_mask=enc_self_mask)
+        # B L/4 512 B 90 512
         '''
         输入与编码输入不同
         '''
         dec_out = self.dec_embedding(x_dec, x_mark_dec)
+        # B K 512 B 204(180+24) 512
         dec_out = self.decoder(dec_out, enc_out, x_mask=dec_self_mask, cross_mask=dec_enc_mask)
+        # B K 512
         dec_out = self.projection(dec_out)
+        # B K 512-> B K 1
         
         if self.output_attention:
             return dec_out[:,-self.pred_len:,:], attns
         else:
             return dec_out[:,-self.pred_len:,:] # [B, L, D]
+        # B -pre_len 1 ,B 24 1
 
 class InformerStack(nn.Module):
     def __init__(self, enc_in, dec_in, out_len=24, d_model=512, embed='fixed', freq='h', dropout=0.0, attn='prob', factor=5, output_attention = False,
                  n_heads=8, d_ff=512, activation='gelu', e_layers=[3,2,1], distil=True, d_layers=2, mix=True, c_out=1):
         super(InformerStack, self).__init__()
+        # enc_in=8,dec_in=8,freq='t', dropout=0.1,out_len = 24, c_out=1
         self.pred_len = out_len
+        # 预测24
         self.attn = attn
+        # 是否使用稀疏注意力
         self.output_attention = output_attention
 
         # Encoding
         self.enc_embedding = DataEmbedding(enc_in, d_model, embed, freq, dropout)
+        # 8,512,fixed,t,0.1
         self.dec_embedding = DataEmbedding(dec_in, d_model, embed, freq, dropout)
+        # 8,512,fixed,t,0.1
         # Attention
         Attn = ProbAttention if attn=='prob' else FullAttention
         # Encoder
@@ -586,6 +615,7 @@ class InformerStack(nn.Module):
                 ] if distil else None,
                 norm_layer=torch.nn.LayerNorm(d_model)
             ) for el in e_layers]
+        # el 3,2,1,inp_lens 0,1,2
         self.encoder = EncoderStack(encoders, inp_lens)
         # Decoder
         self.decoder = Decoder(
@@ -609,6 +639,7 @@ class InformerStack(nn.Module):
     def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, 
                 enc_self_mask=None, dec_self_mask=None, dec_enc_mask=None):
         enc_out = self.enc_embedding(x_enc, x_mark_enc)
+        # (batch,360,8)
         enc_out, attns = self.encoder(enc_out, attn_mask=enc_self_mask)
 
         dec_out = self.dec_embedding(x_dec, x_mark_dec)
